@@ -11,9 +11,14 @@ import 'generated/BBCodeParser.dart';
 import 'generated/BBCodeLexer.dart';
 
 class BBCodeWidget extends StatefulWidget {
-  const BBCodeWidget({super.key, required this.bbcode});
+  const BBCodeWidget({
+    super.key,
+    required this.bbcode,
+    this.textScaler = TextScaler.noScaling,
+  });
 
   final String bbcode;
+  final TextScaler textScaler;
 
   @override
   State<StatefulWidget> createState() => _BBCodeWidgetState();
@@ -22,15 +27,6 @@ class BBCodeWidget extends StatefulWidget {
 class _BBCodeWidgetState extends State<BBCodeWidget> {
   bool _isVisible = false;
 
-  /// color 可以为三种表现形式
-  ///
-  /// `ARGB: #FFFFFFFF`
-  ///
-  /// `RGB: #FFFFFF`
-  ///
-  /// `NAME: red`
-  ///
-  /// 若全部解析失败则返回 null 使用默认颜色
   Color? _parseColor(String hex) {
     if (hex.startsWith('#')) {
       hex = hex.replaceFirst('#', '');
@@ -60,7 +56,6 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
   @override
   Widget build(BuildContext context) {
     BBCodeParser.checkVersion();
-    BBCodeParser.checkVersion();
     final input = InputStream.fromString(widget.bbcode);
     final lexer = BBCodeLexer(input);
     final tokens = CommonTokenStream(lexer);
@@ -70,9 +65,16 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
     ParseTreeWalker.DEFAULT.walk(bbcodeBaseListener, tree);
     bbCodeTag.clear();
 
+    final imageUrls = bbcodeBaseListener.bbcode
+        .whereType<BBCodeImg>()
+        .map((e) => e.imageUrl)
+        .toList();
+    var imageIndex = 0;
+
     return Wrap(
       children: [
         RichText(
+          textScaler: widget.textScaler,
           text: TextSpan(
             style: DefaultTextStyle.of(context).style,
             children: bbcodeBaseListener.bbcode.map((e) {
@@ -120,12 +122,19 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
                   ),
                 );
               } else if (e is BBCodeImg) {
+                final currentIndex = imageIndex++;
+                final heroTag =
+                    ImageViewer.heroTagFor(e.imageUrl, currentIndex);
                 return WidgetSpan(
                   child: GestureDetector(
-                    onTap: () => ImageViewer.show(context,
-                        imageUrl: e.imageUrl, heroTag: e.imageUrl),
+                    onTap: () => ImageViewer.show(
+                      context,
+                      imageUrls: imageUrls,
+                      initialIndex: currentIndex,
+                      heroTag: heroTag,
+                    ),
                     child: Hero(
-                      tag: e.imageUrl,
+                      tag: heroTag,
                       child: CachedNetworkImage(
                         imageUrl: e.imageUrl,
                         placeholder: (context, url) =>
@@ -185,7 +194,6 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
                   ),
                 );
               } else {
-                // e is Icon
                 return WidgetSpan(
                   child: Icon(
                     (e as Icon).icon,

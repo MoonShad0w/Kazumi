@@ -41,7 +41,7 @@ class _CollectButtonState extends State<CollectButton> {
   // 4. 看过
   // 5. 抛弃
   late int collectType;
-  final CollectController collectController = Modular.get<CollectController>();
+  final CollectController collectController = inject<CollectController>();
 
   @override
   void initState() {
@@ -125,7 +125,8 @@ class _CollectButtonState extends State<CollectButton> {
         (int index) => MenuItemButton(
           onPressed: () async {
             if (index != collectType && mounted) {
-              await collectController.addCollect(widget.bangumiItem, type: index);
+              await collectController.addCollect(widget.bangumiItem,
+                  type: index);
               // 防止状态错误刷新
               if (!mounted) {
                 return;

@@ -1,16 +1,75 @@
+import 'dart:async';
+
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
-import 'package:kazumi/utils/logger.dart';
+import 'package:kazumi/modules/my/watch_stats.dart';
+import 'package:kazumi/repositories/download_repository.dart';
+import 'package:kazumi/repositories/history_repository.dart';
+import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/update/auto_updater.dart';
 import 'package:mobx/mobx.dart';
-import 'package:kazumi/utils/storage.dart';
-import 'package:hive_ce/hive.dart';
-import 'package:kazumi/utils/auto_updater.dart';
 
 part 'my_controller.g.dart';
 
 class MyController = _MyController with _$MyController;
 
 abstract class _MyController with Store {
-  Box setting = GStorage.setting;
+  _MyController(
+    this._historyRepository,
+    this._downloadRepository,
+  );
+
+  final IHistoryRepository _historyRepository;
+  final IDownloadRepository _downloadRepository;
+
+  @observable
+  WatchStats watchStats = const WatchStats();
+
+  static const Duration _refreshDebounce = Duration(milliseconds: 300);
+
+  int _viewerCount = 0;
+  final List<StreamSubscription<void>> _subscriptions = [];
+  Timer? _refreshDebounceTimer;
+
+  // Route swaps can briefly attach two page instances.
+  void attach() {
+    _viewerCount++;
+    if (_subscriptions.isEmpty) {
+      for (final changes in [
+        _historyRepository.changes,
+        _downloadRepository.changes,
+      ]) {
+        _subscriptions.add(changes.listen((_) => _scheduleRefresh()));
+      }
+    }
+    _refresh();
+  }
+
+  void detach() {
+    if (--_viewerCount > 0) {
+      return;
+    }
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = null;
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+  }
+
+  void _scheduleRefresh() {
+    // Coalesce frequent playback history writes.
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = Timer(_refreshDebounce, _refresh);
+  }
+
+  @action
+  void _refresh() {
+    watchStats = WatchStats.from(
+      histories: _historyRepository.getAllHistories(),
+      downloadRecords: _downloadRepository.getAllRecords(),
+    );
+  }
 
   @observable
   ObservableList<String> shieldList = ObservableList.of([]);
@@ -25,7 +84,8 @@ abstract class _MyController with Store {
         try {
           if (RegExp(pattern).hasMatch(danmaku)) return true;
         } catch (_) {
-          KazumiLogger().e('Danmaku: invalid danmaku shield regex pattern: $pattern');
+          KazumiLogger()
+              .e('Danmaku: invalid danmaku shield regex pattern: $pattern');
           continue;
         }
       } else {

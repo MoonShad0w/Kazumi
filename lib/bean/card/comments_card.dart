@@ -1,30 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/bean/widget/bangumi_avatar.dart';
 import 'package:kazumi/modules/comments/comment_item.dart';
-import 'package:kazumi/utils/utils.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:kazumi/utils/date_time.dart';
 
 class CommentsCard extends StatelessWidget {
-  CommentsCard({
+  const CommentsCard({
     super.key,
-    required this.commentItem,
-  }) {
-    isBone = false;
-  }
+    required CommentItem this.commentItem,
+  }) : _isOwn = false;
 
-  CommentsCard.bone({
+  const CommentsCard.bone({super.key})
+      : commentItem = null,
+        _isOwn = false;
+
+  const CommentsCard.own({
     super.key,
-  }) {
-    isBone = true;
-    commentItem = null;
-  }
+    required CommentItem this.commentItem,
+  }) : _isOwn = true;
 
-  late final CommentItem? commentItem;
-  late final bool isBone;
+  final CommentItem? commentItem;
+  final bool _isOwn;
 
   @override
   Widget build(BuildContext context) {
-    if (isBone) {
+    final item = commentItem;
+    if (item == null) {
       return Skeletonizer.zone(
         enabled: true,
         child: Column(
@@ -61,21 +63,46 @@ class CommentsCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  backgroundImage: NetworkImage(commentItem!.user.avatar.large),
+                BangumiAvatar(
+                  imageUrl: item.user.avatar.large,
                 ),
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(commentItem!.user.nickname),
-                    Text(Utils.dateFormat(commentItem!.comment.updatedAt)),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(item.user.nickname),
+                          if (_isOwn)
+                            Container(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '我的吐槽',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer),
+                                ))
+                        ],
+                      ),
+                      Text(dateFormat(item.comment.updatedAt)),
+                    ],
+                  ),
                 ),
-                Expanded(child: Container(height: 10)),
+                const SizedBox(width: 8),
                 RatingBarIndicator(
                   itemCount: 5,
-                  rating: commentItem!.comment.rate.toDouble() / 2,
+                  rating: item.comment.rate.toDouble() / 2,
                   itemBuilder: (context, index) => const Icon(
                     Icons.star_rounded,
                   ),
@@ -84,7 +111,7 @@ class CommentsCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(commentItem!.comment.comment),
+            Text(item.comment.comment),
           ],
         ),
       ),
